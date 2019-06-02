@@ -1,6 +1,5 @@
 package com.narims.myapplication.repo
 
-import android.database.sqlite.SQLiteConstraintException
 import com.narims.myapplication.db.WeatherDao
 import com.narims.myapplication.model.WeatherItem
 import com.narims.myapplication.network.AutocompleteApi
@@ -31,11 +30,16 @@ class MultiSourceWeatherRepo(
             .observeOn(Schedulers.io())
             .doOnSuccess {
                 weatherDao.removeAll()
+                val weatherItems = ArrayList<WeatherItem>()
                 it.autocompleteItems?.forEach { item ->
                     item.cityName?.let { name ->
-                        syncWeatherItemInsert(name, query)
+                        syncWeatherItemInsert(name, query)?.let { weather ->
+                            weatherItems.add(weather)
+                        }
                     }
                 }
+                if (weatherItems.isNotEmpty())
+                    weatherDao.insert(weatherItems)
             })
     }
 
@@ -51,34 +55,29 @@ class MultiSourceWeatherRepo(
         }
     }
 
-    private fun syncWeatherItemInsert(cityName: String, query: String) {
+    private fun syncWeatherItemInsert(cityName: String, query: String): WeatherItem? {
         try {
-            saveWeatherItemResponse(weatherApi.getWeather(cityName).execute(), cityName, query)
+            return saveWeatherItemResponse(weatherApi.getWeather(cityName).execute(), cityName, query)
         } catch (e: IOException) {
         }
+        return null
     }
 
     private fun saveWeatherItemResponse(
         weatherItemResponse: Response<WeatherItem>,
         cityName: String,
         query: String
-    ) {
+    ): WeatherItem? {
+        var result: WeatherItem? = null
         if (weatherItemResponse.isSuccessful) {
             weatherItemResponse.body()?.let { weatherItem ->
                 weatherItem.createdAt = System.currentTimeMillis()
                 weatherItem.cityName = cityName
                 weatherItem.queryCache = query.split(",")[0]
-                upsertWeather(weatherItem)
+                result = weatherItem
             }
         }
-    }
-
-    private fun upsertWeather(weatherItem: WeatherItem) {
-        try {
-            weatherDao.insert(weatherItem)
-        } catch (exception: SQLiteConstraintException) {
-            weatherDao.update(weatherItem)
-        }
+        return result
     }
 
     private fun getTimeFrom(): Long {

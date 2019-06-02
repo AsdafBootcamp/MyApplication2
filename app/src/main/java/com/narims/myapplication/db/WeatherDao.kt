@@ -14,11 +14,8 @@ interface WeatherDao {
     @Query("SELECT * FROM weatheritem LIMIT :limit")
     fun getAllSync(limit: Int): List<WeatherItem>
 
-    @Insert(onConflict = OnConflictStrategy.FAIL)
-    fun insert(weatherItem: WeatherItem)
-
-    @Update(onConflict = OnConflictStrategy.IGNORE)
-    fun update(weatherItem: WeatherItem)
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insert(weatherItemList: List<WeatherItem>)
 
     @Query("DELETE FROM weatheritem")
     fun removeAll()
