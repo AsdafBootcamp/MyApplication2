@@ -8,7 +8,8 @@ import io.reactivex.Maybe
 
 @Dao
 interface WeatherDao {
-    @Query("SELECT * FROM weatheritem WHERE createdAt > :timestampFrom LIMIT :limit")
+    @Query("SELECT * FROM weatheritem WHERE createdAt > :timestampFrom " +
+            "AND createdAt = (SELECT max(createdAt) FROM weatheritem)  LIMIT :limit")
     fun getAll(timestampFrom: Long, limit: Int): Flowable<List<WeatherItem>>
 
     @Query("SELECT * FROM weatheritem LIMIT :limit")

@@ -29,17 +29,20 @@ class MultiSourceWeatherRepo(
         return Completable.fromMaybe(autocompleteApi.getAutocomplete(query)
             .observeOn(Schedulers.io())
             .doOnSuccess {
-                weatherDao.removeAll()
                 val weatherItems = ArrayList<WeatherItem>()
+                val createdAt = System.currentTimeMillis()
                 it.autocompleteItems?.forEach { item ->
                     item.cityName?.let { name ->
-                        syncWeatherItemInsert(name, query)?.let { weather ->
+                        syncWeatherItemInsert(name, query, createdAt)?.let { weather ->
                             weatherItems.add(weather)
                         }
                     }
                 }
                 if (weatherItems.isNotEmpty())
                     weatherDao.insert(weatherItems)
+                else {
+                    weatherDao.removeAll()
+                }
             })
     }
 
@@ -55,9 +58,9 @@ class MultiSourceWeatherRepo(
         }
     }
 
-    private fun syncWeatherItemInsert(cityName: String, query: String): WeatherItem? {
+    private fun syncWeatherItemInsert(cityName: String, query: String, createdAt: Long): WeatherItem? {
         try {
-            return saveWeatherItemResponse(weatherApi.getWeather(cityName).execute(), cityName, query)
+            return saveWeatherItemResponse(weatherApi.getWeather(cityName).execute(), cityName, query, createdAt)
         } catch (e: IOException) {
         }
         return null
@@ -66,12 +69,13 @@ class MultiSourceWeatherRepo(
     private fun saveWeatherItemResponse(
         weatherItemResponse: Response<WeatherItem>,
         cityName: String,
-        query: String
+        query: String,
+        createdAt: Long
     ): WeatherItem? {
         var result: WeatherItem? = null
         if (weatherItemResponse.isSuccessful) {
             weatherItemResponse.body()?.let { weatherItem ->
-                weatherItem.createdAt = System.currentTimeMillis()
+                weatherItem.createdAt = createdAt
                 weatherItem.cityName = cityName
                 weatherItem.queryCache = query.split(",")[0]
                 result = weatherItem
